@@ -1,0 +1,19 @@
+
+import 'termollo/termollo.pic' as termollo
+import 'time' as time
+import 'str' as str
+
+termollo.init()
+var cont = true
+while cont {
+    termollo.print(0, 0, 'NCurses input utility')
+    termollo.print(0, 1, 'Enter to exit')
+    const inp = termollo.input()
+    if inp != -1
+        termollo.print(0, 3, str.numToStr(inp) + '   ')
+    if inp == 10
+        cont = false
+    termollo.refresh()
+}
+termollo.stop()
+

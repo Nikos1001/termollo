@@ -1,0 +1,62 @@
+
+import 'io' as io
+import 'dll' as dll
+
+var dllLib = nil
+var _nat_print = nil
+var _nat_refresh = nil
+var _nat_input = nil
+var _nat_setColor = nil
+const init = fn -> {
+    dllLib = dll.open('termollo/build/libtermollo.' + dll.extension)
+    dllLib.get('init')()
+    _nat_print = dllLib.get('print')
+    _nat_refresh = dllLib.get('refresh_')
+    _nat_input = dllLib.get('input')
+    _nat_setColor = dllLib.get('setColor')
+}
+
+const stop = fn -> {
+    if dllLib == nil {
+        io.print('termollo not initialized.')
+    } else {
+        dllLib.get('stop')()
+        dllLib = nil
+    }
+}
+
+const print = fn x, y, str -> {
+    if dllLib == nil
+        io.print('termollo not initialized.')
+    else
+        _nat_print(y, x, str)
+}
+
+const refresh = fn -> {
+    if dllLib == nil
+        io.print('termollo not initialized.')
+    else
+        _nat_refresh()
+}
+
+const input = fn -> {
+    if dllLib == nil
+        io.print('termollo not initialized.')
+    else
+        _nat_input()
+}
+
+const black = 0
+const red = 1
+const green = 2
+const yellow = 3
+const blue = 4
+const magenta = 5
+const cyan = 6
+const white = 7
+const setColor = fn fg, bg -> {
+    if dllLib == nil
+        io.print('termollo not initialized.')
+    else
+        _nat_setColor(fg, bg)
+}

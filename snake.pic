@@ -1,0 +1,267 @@
+
+import 'termollo/termollo.pic' as term
+import 'str' as str
+import 'time' as time
+import 'io' as io
+import 'random' as rng
+import 'math' as math
+
+var state = 'main'
+
+const w = 32
+const h = 16
+var map = for x in 0..w for y in 0..h 0
+# 0 = empty
+# 1 = up
+# 2 = right
+# 3 = down
+# 4 = left
+# 5 = apple
+var score = 0
+
+const getCell = fn x, y ->
+    if x < 0 or x >= w or y < 0 or y >= h
+        0
+    else
+        map[x][y]
+
+const getCellChar = fn x, y -> {
+    const cell = getCell(x, y)
+    if cell == 0
+        ' '
+    else if cell >= 1 and cell <= 4
+        '#'
+    else if cell == 5
+        '@'
+}
+
+const getCellColor = fn x, y -> {
+    const cell = getCell(x, y)
+    if cell == 0
+        term.black
+    else if cell >= 1 and cell <= 4
+        term.green
+    else if cell == 5
+        term.red
+}
+
+const display = fn -> {
+    term.setColor(term.white, term.black)
+    term.print(0, 0, ' Score: ' + str.numToStr(score))
+    term.print(0, 1, '=' * w)
+    term.setColor(term.black, term.black)
+    for x in 0..w
+        for y in 0..h
+            term.print(x, y + 2, ' ')
+    for p in particles {
+        if p.x >= 0 and p.x < w and p.y >= 0 and p.y < h {
+            term.setColor(p.color, term.black)
+            term.print(p.x, p.y + 2, '.')
+        }
+    }
+    for x in 0..w {
+        for y in 0..h {
+            term.setColor(getCellColor(x, y), term.black)
+            const char = getCellChar(x, y)
+            if char != ' '
+                term.print(x, y + 2, char)
+        }
+    }
+    term.refresh()
+}
+
+for x in 5..10
+    map[x][h / 2] = 2
+map[12][4] = 5
+var hx = 9
+var hy = h / 2
+var tx = 5
+var ty = h / 2
+var extend = 0
+var inQueue = []
+
+const resetGame = fn -> {
+    map = for x in 0..w for y in 0..h 0
+    for x in 5..10
+        map[x][h / 2] = 2
+    map[12][4] = 5
+    hx = 9
+    hy = h / 2
+    tx = 5
+    ty = h / 2
+    extend = 0
+    inQueue = []
+    score = 0
+}
+
+const particles = for i in 0..8 {
+    'x': 0,
+    'y': 999,
+    'vx': 0,
+    'vy': 0,
+    'color': if i % 2 == 0 term.cyan else term.yellow
+}
+const particleVelocities = [
+    [1.25, 0],
+    [1, 1],
+    [0, 1.25],
+    [-1, 1],
+    [-1.25, 0],
+    [-1, -1],
+    [0, -1.25],
+    [1, -1]
+]
+
+const dir = fn x, y ->
+    [
+        nil,
+        [0, -1],
+        [1, 0],
+        [0, 1],
+        [-1, 0]
+    ][getCell(x, y)]
+
+const update = fn -> {
+
+    # retract tail
+    if extend == 0 {
+        const tdir = dir(tx, ty)
+        const oldTx = tx
+        const oldTy = ty
+        tx = tx + tdir[0]
+        ty = ty + tdir[1]
+        map[oldTx][oldTy] = 0
+    } else {
+        extend = extend - 1
+    }
+
+    # process input
+    if inQueue.length > 0 {
+        const input = inQueue[0]
+        inQueue = for i in 1..inQueue.length inQueue[i]
+        if (input + 1) % 4 + 1 != map[hx][hy]
+            map[hx][hy] = input
+    }
+
+    # extend head
+    const hdir = dir(hx, hy)
+    const hCell = getCell(hx, hy)
+    hx = hx + hdir[0]
+    hy = hy + hdir[1]
+    if hx < 0 or hx >= w or hy < 0 or hy >= h or (map[hx][hy] != 0 and map[hx][hy] != 5) {
+        deathTime = time.clock()
+        state = 'dead'
+    } else {
+        if map[hx][hy] == 5 {
+            extend = 3
+            score = score + 1
+            var x = rng.val() * w
+            var y = rng.val() * h
+            while map[x][y] != 0 {
+                x = rng.val() * w
+                y = rng.val() * h
+            }
+            map[x][y] = 5
+
+            for i in 0..particles.length {
+                particles[i].x = hx
+                particles[i].y = hy
+                particles[i].vx = particleVelocities[i][0] / 2
+                particles[i].vy = particleVelocities[i][1] / 2
+            }
+        }
+        map[hx][hy] = hCell
+    }
+}
+
+const updateParticles = fn -> {
+    for p in particles {
+        p.x = p.x + p.vx
+        p.y = p.y + p.vy
+        p.vy = p.vy + 0.075
+    }
+}
+
+const keys = {
+    119: 1,
+    100: 2,
+    115: 3,
+    97: 4
+}
+
+var prevUpdateTime = time.clock()
+var prevParticleUpdateTime = prevUpdateTime
+
+var gameState = fn -> {
+    display()
+    const input = term.input()
+    if input in keys and inQueue.length < 3
+        inQueue = inQueue + [keys[input]]
+    if input == 27
+        state = 'exit'
+    const t = time.clock()
+    if t - prevUpdateTime > 0.2 {
+        prevUpdateTime = t
+        update()
+    }
+    if t - prevParticleUpdateTime > 0.05 {
+        prevParticleUpdateTime = t
+        updateParticles()
+    }
+}
+
+const title = [
+    '                                ',
+    '                                ',
+    '                                ',
+    ' ####  #   #    #    #  #  #### ',
+    ' #     ##  #   # #   # #   #    ',
+    ' ####  # # #  #   #  ##    #### ',
+    '    #  #  ##  #   #  # #   #    ',
+    ' ####  #   #  #   #  #  #  #### ',
+    '                                ',
+    '                                ',
+    '                                '
+]
+
+const mainMenuState = fn -> {
+    term.setColor(term.green, term.black)
+    for x in 0..w {
+        const off = 0.5 * math.sin(x / 5 + 2 * time.clock())
+        for y in 0..7 {
+            term.print(x, y, title[y + 2 + off][x])
+        }
+    }
+    term.setColor(term.white, term.black)
+    term.print(4, 10, 'Press any key to play!')
+    term.print(4, 12, 'Made with <3 in piccolo')
+    if term.input() != -1
+        state = 'game'
+    term.refresh()
+}
+
+var deathTime = 0
+const deadState = fn -> {
+    state = 'game'
+    term.setColor(term.white, term.black)
+    const msg = '[You died!]'
+    term.print(w / 2 - msg.length / 2, h / 2 + 1, msg)
+    term.refresh()
+    while state != 'exit' and time.clock() - deathTime < 2 {
+        if term.input() == 27
+            state = 'exit'
+    }
+    resetGame()
+}
+
+const states = {
+    'main': mainMenuState,
+    'dead': deadState,
+    'game': gameState
+}
+
+term.init()
+while state != 'exit' {
+    states[state]()
+}
+term.stop()
